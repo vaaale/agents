@@ -86,6 +86,10 @@ export default {
       inlineSources: true,
       outDir: null,
       declaration: false,
+      compilerOptions: {
+        skipLibCheck: true,
+        skipDefaultLibCheck: true,
+      },
       exclude: [
         'src/proto/**/*',
         'src/scripts/**/*',
@@ -110,5 +114,16 @@ export default {
     //   ]
     // })
   ].filter(Boolean),
-  external: [/node_modules/],
+  external: [
+    /node_modules/,
+    /@langchain\//,
+    /@langfuse\//,
+    /@opentelemetry\//,
+    'cheerio',
+    'dotenv',
+    'https-proxy-agent',
+    'nanoid',
+    'openai',
+    'zod-to-json-schema',
+  ],
 };

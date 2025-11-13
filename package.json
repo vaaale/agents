@@ -1,6 +1,6 @@
 {
   "name": "@librechat/agents",
-  "version": "3.0.00",
+  "version": "3.0.0",
   "main": "./dist/cjs/main.cjs",
   "module": "./dist/esm/main.mjs",
   "types": "./dist/types/index.d.ts",
@@ -34,8 +34,9 @@
   "scripts": {
     "prepare": "node husky-setup.js",
     "prepublishOnly": "npm run build",
-    "build": "NODE_ENV=production rollup -c && tsc -p tsconfig.build.json",
-    "build:dev": "rollup -c",
+    "build": "NODE_OPTIONS='--max-old-space-size=16384' NODE_ENV=production rollup -c",
+    "build:types": "NODE_OPTIONS='--max-old-space-size=16384' tsc -p tsconfig.build.json",
+    "build:dev": "NODE_OPTIONS='--max-old-space-size=8192' rollup -c",
     "start": "node dist/esm/main.js",
     "clean": "node ./config/clean.js",
     "script": "node -r dotenv/config --loader ./tsconfig-paths-bootstrap.mjs --experimental-specifier-resolution=node ./src/scripts/cli.ts",
@@ -87,33 +88,33 @@
     "format": "prettier --write ."
   },
   "overrides": {
-    "@langchain/openai": "0.5.18",
     "@browserbasehq/stagehand": {
       "openai": "$openai"
     }
   },
   "dependencies": {
-    "@langchain/anthropic": "^0.3.26",
-    "@langchain/aws": "^0.1.12",
-    "@langchain/community": "^0.3.47",
-    "@langchain/core": "^0.3.72",
-    "@langchain/deepseek": "^0.0.2",
-    "@langchain/google-genai": "^0.2.13",
-    "@langchain/google-vertexai": "^0.2.13",
-    "@langchain/langgraph": "^0.4.9",
-    "@langchain/mistralai": "^0.2.1",
-    "@langchain/ollama": "^0.2.3",
-    "@langchain/openai": "0.5.18",
-    "@langchain/xai": "^0.0.3",
-    "@langfuse/langchain": "^4.3.0",
-    "@langfuse/otel": "^4.3.0",
-    "@langfuse/tracing": "^4.3.0",
+    "@langchain/anthropic": "^1.0.0",
+    "@langchain/aws": "^1.0.1",
+    "@langchain/community": "^1.0.2",
+    "@langchain/core": "^1.0.4",
+    "@langchain/deepseek": "^1.0.0",
+    "@langchain/google-genai": "^1.0.0",
+    "@langchain/google-vertexai": "^1.0.0",
+    "@langchain/langgraph": "^1.0.2",
+    "@langchain/mistralai": "^1.0.0",
+    "@langchain/ollama": "^1.0.1",
+    "@langchain/openai": "^1.1.0",
+    "@langchain/textsplitters": "^1.0.0",
+    "@langchain/xai": "^1.0.0",
+    "@langfuse/langchain": "^4.4.2",
+    "@langfuse/otel": "^4.4.2",
+    "@langfuse/tracing": "^4.4.2",
     "@opentelemetry/sdk-node": "^0.207.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.7",
     "https-proxy-agent": "^7.0.6",
     "nanoid": "^3.3.7",
-    "openai": "^5.10.1"
+    "openai": "^5.23.2"
   },
   "imports": {
     "@/*": "./src/*",
@@ -122,7 +123,6 @@
   "devDependencies": {
     "@anthropic-ai/vertex-sdk": "^0.12.0",
     "@eslint/compat": "^1.2.7",
-    "@langchain/tavily": "^0.1.5",
     "@rollup/plugin-alias": "^5.1.0",
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-json": "^6.1.0",
