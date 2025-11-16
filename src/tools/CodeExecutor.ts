@@ -94,7 +94,12 @@ Usage:
 `.trim();
 
   return tool<typeof CodeExecutionToolSchema>(
-    async ({ lang, code, session_id, ...rest }) => {
+    async ({
+      lang,
+      code,
+      session_id,
+      ...rest
+    }: z.infer<typeof CodeExecutionToolSchema>) => {
       const postData = {
         lang,
         code,

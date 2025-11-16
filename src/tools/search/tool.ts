@@ -274,7 +274,7 @@ function createTool({
   onSearchResults: t.SearchToolConfig['onSearchResults'];
 }): DynamicStructuredTool<typeof schema> {
   return tool<typeof schema>(
-    async (params, runnableConfig) => {
+    async (params: z.infer<typeof schema>, runnableConfig: RunnableConfig) => {
       const { query, date, country: _c, images, videos, news } = params;
       const country = typeof _c === 'string' && _c ? _c : undefined;
       const searchResult = await search({
