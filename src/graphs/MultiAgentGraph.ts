@@ -159,7 +159,10 @@ export class MultiAgentGraph extends StandardGraph {
 
       tools.push(
         tool(
-          async (input: Record<string, unknown>, config) => {
+          async (
+            input: Record<string, unknown>,
+            config: ToolRunnableConfig
+          ) => {
             const state = getCurrentTaskInput() as t.BaseGraphState;
             const toolCallId =
               (config as ToolRunnableConfig | undefined)?.toolCall?.id ??
@@ -232,7 +235,10 @@ export class MultiAgentGraph extends StandardGraph {
 
         tools.push(
           tool(
-            async (input: Record<string, unknown>, config) => {
+            async (
+              input: Record<string, unknown>,
+              config: ToolRunnableConfig
+            ) => {
               const toolCallId =
                 (config as ToolRunnableConfig | undefined)?.toolCall?.id ??
                 'unknown';

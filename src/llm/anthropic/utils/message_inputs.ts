@@ -409,17 +409,17 @@ function _formatContent(message: BaseMessage) {
         };
         return block;
       } else if (contentPart.type === 'search_result') {
+        // Convert content array to encrypted_content string
+        const encryptedContent =
+          typeof contentPart.content === 'string'
+            ? contentPart.content
+            : JSON.stringify(contentPart.content);
+
         const block: AnthropicSearchResultBlockParam = {
-          type: 'search_result' as const, // Explicitly setting the type as "search_result"
+          type: 'web_search_result' as const, // Explicitly setting the type as "web_search_result"
           title: contentPart.title,
-          source: contentPart.source,
-          ...('cache_control' in contentPart && contentPart.cache_control
-            ? { cache_control: contentPart.cache_control }
-            : {}),
-          ...('citations' in contentPart && contentPart.citations
-            ? { citations: contentPart.citations }
-            : {}),
-          content: contentPart.content,
+          url: contentPart.source, // Map source to url
+          encrypted_content: encryptedContent,
         };
         return block;
       } else if (

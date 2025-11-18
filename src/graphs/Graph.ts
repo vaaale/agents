@@ -21,6 +21,7 @@ import {
   ToolMessage,
   SystemMessage,
   AIMessageChunk,
+  isToolMessage,
 } from '@langchain/core/messages';
 import type {
   BaseMessageFields,
@@ -864,6 +865,40 @@ export class StandardGraph extends Graph<t.BaseGraphState, t.GraphNode> {
       return toolsCondition(state, toolNode, this.invokedToolIds);
     };
 
+    // Check if any tools have returnDirect set to true
+    const returnDirectToolNames = new Set(
+      (agentContext.tools ?? [])
+        .filter((tool) => 'returnDirect' in tool && tool.returnDirect === true)
+        .filter(
+          (tool): tool is typeof tool & { name: string } => 'name' in tool
+        )
+        .map((tool) => tool.name)
+    );
+
+    const routeAfterTools = (state: t.BaseGraphState): typeof END | string => {
+      // If toolEnd is true, always end
+      if (agentContext.toolEnd) {
+        return END;
+      }
+
+      // Check if any recent tool messages are from returnDirect tools
+      if (returnDirectToolNames.size > 0) {
+        const { messages } = state;
+        // Check messages in reverse order until we hit a non-tool message
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const message = messages[i];
+          if (!isToolMessage(message)) {
+            break;
+          }
+          if (message.name && returnDirectToolNames.has(message.name)) {
+            return END;
+          }
+        }
+      }
+
+      return agentNode;
+    };
+
     const StateAnnotation = Annotation.Root({
       messages: Annotation<BaseMessage[]>({
         reducer: messagesStateReducer,
@@ -882,7 +917,7 @@ export class StandardGraph extends Graph<t.BaseGraphState, t.GraphNode> {
       )
       .addEdge(START, agentNode)
       .addConditionalEdges(agentNode, routeMessage)
-      .addEdge(toolNode, agentContext.toolEnd ? END : agentNode);
+      .addConditionalEdges(toolNode, routeAfterTools);
 
     // Cast to unknown to avoid tight coupling to external types; options are opt-in
     return workflow.compile(this.compileOptions as unknown as never);

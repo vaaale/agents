@@ -54,7 +54,9 @@ export const createTitleRunnable = async (
       input: { convo: string },
       config?: Partial<RunnableConfig>
     ): Promise<{ title: string }> => {
-      return await titleOnlyInnerChain.invoke(input, config);
+      return (await titleOnlyInnerChain.invoke(input, config)) as {
+        title: string;
+      };
     },
   }).withConfig({ runName: 'TitleOnlyChain' });
 
@@ -64,7 +66,10 @@ export const createTitleRunnable = async (
       input: { convo: string },
       config?: Partial<RunnableConfig>
     ): Promise<{ language: string; title: string }> => {
-      return await combinedInnerChain.invoke(input, config);
+      return (await combinedInnerChain.invoke(input, config)) as {
+        language: string;
+        title: string;
+      };
     },
   }).withConfig({ runName: 'TitleLanguageChain' });
 
