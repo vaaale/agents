@@ -74,7 +74,7 @@ const EXEC_ENDPOINT = `${baseEndpoint}/exec`;
 
 function createCodeExecutionTool(
   params: t.CodeExecutionToolParams = {}
-): DynamicStructuredTool<typeof CodeExecutionToolSchema> {
+) {
   const apiKey =
     params[EnvVar.CODE_API_KEY] ??
     params.apiKey ??
@@ -93,8 +93,8 @@ Usage:
 - NEVER use this tool to execute malicious code.
 `.trim();
 
-  return tool<typeof CodeExecutionToolSchema>(
-    async ({ lang, code, session_id, ...rest }) => {
+  return tool(
+    async ({ lang, code, session_id, ...rest }: z.infer<typeof CodeExecutionToolSchema> & Record<string, unknown>) => {
       const postData = {
         lang,
         code,

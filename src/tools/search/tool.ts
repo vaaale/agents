@@ -272,9 +272,9 @@ function createTool({
   schema: t.SearchToolSchema;
   search: ReturnType<typeof createSearchProcessor>;
   onSearchResults: t.SearchToolConfig['onSearchResults'];
-}): DynamicStructuredTool<typeof schema> {
-  return tool<typeof schema>(
-    async (params, runnableConfig) => {
+}) {
+  return tool(
+    async (params: z.infer<typeof schema>, runnableConfig: RunnableConfig) => {
       const { query, date, country: _c, images, videos, news } = params;
       const country = typeof _c === 'string' && _c ? _c : undefined;
       const searchResult = await search({
@@ -289,7 +289,7 @@ function createTool({
           onSearchResults: _onSearchResults,
         }),
       });
-      const turn = runnableConfig.toolCall?.turn ?? 0;
+      const turn = (runnableConfig as RunnableConfig & { toolCall?: { turn?: number } }).toolCall?.turn ?? 0;
       const { output, references } = formatResultsForLLM(turn, searchResult);
       const data: t.SearchResultData = { turn, ...searchResult, references };
       return [output, { [Constants.WEB_SEARCH]: data }];
@@ -355,7 +355,7 @@ Use anchor marker(s) immediately after the statement:
  */
 export const createSearchTool = (
   config: t.SearchToolConfig = {}
-): DynamicStructuredTool<typeof toolSchema> => {
+) => {
   const {
     searchProvider = 'serper',
     serperApiKey,
