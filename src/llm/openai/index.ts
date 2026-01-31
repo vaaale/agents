@@ -3,15 +3,19 @@ import { AIMessageChunk } from '@langchain/core/messages';
 import { ChatXAI as OriginalChatXAI } from '@langchain/xai';
 import { ChatGenerationChunk } from '@langchain/core/outputs';
 import { ToolDefinition } from '@langchain/core/language_models/base';
-import { isLangChainTool } from '@langchain/core/utils/function_calling';
+import {
+  isLangChainTool,
+  convertToOpenAITool,
+} from '@langchain/core/utils/function_calling';
 import { ChatDeepSeek as OriginalChatDeepSeek } from '@langchain/deepseek';
 import { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import {
   getEndpoint,
   OpenAIClient,
-  formatToOpenAITool,
   ChatOpenAI as OriginalChatOpenAI,
   AzureChatOpenAI as OriginalAzureChatOpenAI,
+  convertCompletionsDeltaToBaseMessageChunk,
+  type ClientOptions,
 } from '@langchain/openai';
 import type {
   OpenAIChatCallOptions,
@@ -109,15 +113,15 @@ export function _convertToOpenAITool(
     strict?: boolean;
   }
 ): OpenAIClient.ChatCompletionTool {
-  let toolDef: OpenAIClient.ChatCompletionTool | undefined;
+  let toolDef: OpenAIClient.ChatCompletionTool;
 
   if (isLangChainTool(tool)) {
-    toolDef = formatToOpenAITool(tool);
+    toolDef = convertToOpenAITool(tool) as OpenAIClient.ChatCompletionTool;
   } else {
-    toolDef = tool as ToolDefinition;
+    toolDef = tool as OpenAIClient.ChatCompletionTool;
   }
 
-  if (fields?.strict !== undefined) {
+  if (fields?.strict !== undefined && 'function' in toolDef) {
     toolDef.function.strict = fields.strict;
   }
 
@@ -277,12 +281,12 @@ export class ChatOpenAI extends OriginalChatOpenAI<t.ChatOpenAICallOptions> {
     options: this['ParsedCallOptions'],
     runManager?: CallbackManagerForLLMRun
   ): AsyncGenerator<ChatGenerationChunk> {
-    if (!this._useResponseApi(options)) {
+    if (!this.useResponsesApi) {
       return yield* this._streamResponseChunks2(messages, options, runManager);
     }
-    const streamIterable = await this.responseApiWithRetry(
+    const streamIterable = await this.responses.completionWithRetry(
       {
-        ...this.invocationParams<'responses'>(options, { streaming: true }),
+        ...this.responses.invocationParams(options),
         input: _convertMessagesToOpenAIResponsesParams(
           messages,
           this.model,
@@ -324,15 +328,16 @@ export class ChatOpenAI extends OriginalChatOpenAI<t.ChatOpenAICallOptions> {
       _convertMessagesToOpenAIParams(messages, this.model);
 
     const params = {
-      ...this.invocationParams(options, {
-        streaming: true,
-      }),
+      ...this.completions.invocationParams(options),
       messages: messagesMapped,
       stream: true as const,
     };
     let defaultRole: OpenAIRoleEnum | undefined;
 
-    const streamIterable = await this.completionWithRetry(params, options);
+    const streamIterable = await this.completions.completionWithRetry(
+      params,
+      options
+    );
     let usage: OpenAIClient.Completions.CompletionUsage | undefined;
     for await (const data of streamIterable) {
       const choice = data.choices[0] as
@@ -349,11 +354,11 @@ export class ChatOpenAI extends OriginalChatOpenAI<t.ChatOpenAICallOptions> {
       if (!delta) {
         continue;
       }
-      const chunk = this._convertOpenAIDeltaToBaseMessageChunk(
+      const chunk = convertCompletionsDeltaToBaseMessageChunk({
         delta,
-        data,
-        defaultRole
-      );
+        rawResponse: data,
+        defaultRole,
+      });
       if ('reasoning_content' in delta) {
         chunk.additional_kwargs.reasoning_content = delta.reasoning_content;
       } else if ('reasoning' in delta) {
@@ -571,12 +576,12 @@ export class AzureChatOpenAI extends OriginalAzureChatOpenAI {
     options: this['ParsedCallOptions'],
     runManager?: CallbackManagerForLLMRun
   ): AsyncGenerator<ChatGenerationChunk> {
-    if (!this._useResponseApi(options)) {
+    if (!this._useResponsesApi(options)) {
       return yield* super._streamResponseChunks(messages, options, runManager);
     }
-    const streamIterable = await this.responseApiWithRetry(
+    const streamIterable = await this.responses.completionWithRetry(
       {
-        ...this.invocationParams<'responses'>(options, { streaming: true }),
+        ...this.responses.invocationParams(options),
         input: _convertMessagesToOpenAIResponsesParams(
           messages,
           this.model,
@@ -611,15 +616,16 @@ export class AzureChatOpenAI extends OriginalAzureChatOpenAI {
 }
 export class ChatDeepSeek extends OriginalChatDeepSeek {
   public get exposedClient(): CustomOpenAIClient {
-    return this.client;
+    return this.client as unknown as CustomOpenAIClient;
   }
   static lc_name(): 'LibreChatDeepSeek' {
     return 'LibreChatDeepSeek';
   }
+  // @ts-expect-error - Parameter type mismatch between different openai package versions
   protected _getClientOptions(
-    options?: OpenAICoreRequestOptions
+    options: OpenAICoreRequestOptions | undefined
   ): OpenAICoreRequestOptions {
-    if (!(this.client as OpenAIClient | undefined)) {
+    if (!(this.client as unknown as OpenAIClient | undefined)) {
       const openAIEndpointConfig: t.OpenAIEndpointConfig = {
         baseURL: this.clientConfig.baseURL,
       };
@@ -635,7 +641,8 @@ export class ChatDeepSeek extends OriginalChatDeepSeek {
         delete params.baseURL;
       }
 
-      this.client = new CustomOpenAIClient(params);
+      (this as unknown as { client: CustomOpenAIClient }).client =
+        new CustomOpenAIClient(params as ClientOptions);
     }
     const requestOptions = {
       ...this.clientConfig,
@@ -655,9 +662,7 @@ export class ChatDeepSeek extends OriginalChatDeepSeek {
       });
 
     const params = {
-      ...this.invocationParams(options, {
-        streaming: true,
-      }),
+      ...this.invocationParams(options),
       messages: messagesMapped,
       stream: true as const,
     };
@@ -680,7 +685,7 @@ export class ChatDeepSeek extends OriginalChatDeepSeek {
       if (!delta) {
         continue;
       }
-      const chunk = this._convertOpenAIDeltaToBaseMessageChunk(
+      const chunk = this._convertCompletionsDeltaToBaseMessageChunk(
         delta,
         data,
         defaultRole
@@ -819,13 +824,14 @@ export class ChatXAI extends OriginalChatXAI {
   }
 
   public get exposedClient(): CustomOpenAIClient {
-    return this.client;
+    return this.client as unknown as CustomOpenAIClient;
   }
 
+  // @ts-expect-error - Parameter type mismatch between different openai package versions
   protected _getClientOptions(
-    options?: OpenAICoreRequestOptions
+    options: OpenAICoreRequestOptions | undefined
   ): OpenAICoreRequestOptions {
-    if (!(this.client as OpenAIClient | undefined)) {
+    if (!(this.client as unknown as OpenAIClient | undefined)) {
       const openAIEndpointConfig: t.OpenAIEndpointConfig = {
         baseURL: this.clientConfig.baseURL,
       };
@@ -841,7 +847,8 @@ export class ChatXAI extends OriginalChatXAI {
         delete params.baseURL;
       }
 
-      this.client = new CustomOpenAIClient(params);
+      (this as unknown as { client: CustomOpenAIClient }).client =
+        new CustomOpenAIClient(params as ClientOptions);
     }
     const requestOptions = {
       ...this.clientConfig,
@@ -859,9 +866,7 @@ export class ChatXAI extends OriginalChatXAI {
       _convertMessagesToOpenAIParams(messages, this.model);
 
     const params = {
-      ...this.invocationParams(options, {
-        streaming: true,
-      }),
+      ...this.invocationParams(options),
       messages: messagesMapped,
       stream: true as const,
     };
@@ -884,7 +889,7 @@ export class ChatXAI extends OriginalChatXAI {
       if (!delta) {
         continue;
       }
-      const chunk = this._convertOpenAIDeltaToBaseMessageChunk(
+      const chunk = this._convertCompletionsDeltaToBaseMessageChunk(
         delta,
         data,
         defaultRole
